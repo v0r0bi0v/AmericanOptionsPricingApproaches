@@ -1,13 +1,12 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import tqdm_notebook as tqdm
-from sklearn.base import TransformerMixin
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import Ridge  # Добавляем импорт Ridge
 from IPython.display import display, clear_output
 from dataclasses import dataclass
 
-from abstracts import PricerAbstract
-from samplers import SamplerAbstract, PricerAbstract
-
+from abstracts import PricerAbstract, SamplerAbstract
 
 def _plot_progress(sampler, bar, price_history, lower_bound, upper_bound):
     clear_output(wait=True)
@@ -23,27 +22,22 @@ def _plot_progress(sampler, bar, price_history, lower_bound, upper_bound):
     plt.grid()
     plt.show()
 
-
 @dataclass
 class AmericanMonteCarloResult:
     price_history: np.ndarray
     lower_bound: np.ndarray
     upper_bound: np.ndarray
 
-
-
-
-
 class PricerAmericanMonteCarlo(PricerAbstract):
     def __init__(
             self,
             sampler: SamplerAbstract,
-            basis_functions_transformer: TransformerMixin,
+            degree: int = 3,
             regularization_alpha: float = 1e-4
     ):
         self.sampler = sampler
         self.regularization_alpha = regularization_alpha
-        self.basis_functions_transformer = basis_functions_transformer
+        self.basis_functions_transformer = PolynomialFeatures(degree=degree)
         self.price_history: np.ndarray | None = None
         self.option_price: np.ndarray | None = None
         self.result = {}
@@ -53,10 +47,8 @@ class PricerAmericanMonteCarlo(PricerAbstract):
         if not quiet:
             self.sampler.plot(cnt=10, plot_mean=True, y="payoff, discount_factor, markov_state")
         
-        # may be incorrect for a general case
-        # when discount rate is stochastic and correlated with underlying todo throw not implemented error
-        discounted_payoff = self.sampler.payoff * self.sampler.discount_factor  
-        
+        discounted_payoff = self.sampler.payoff * self.sampler.discount_factor
+
         self.option_price = discounted_payoff[:, -1].copy()
         weights = [None] * self.sampler.cnt_times
         self.price_history = [None] * (self.sampler.cnt_times - 1) + [self.option_price.mean()]
@@ -80,10 +72,12 @@ class PricerAmericanMonteCarlo(PricerAbstract):
                     continue
                 features = self.sampler.markov_state[in_the_money_indices, time_index]
                 transformed = self.basis_functions_transformer.fit_transform(features)
+                
                 if not test:
-                    regularization = np.eye(transformed.shape[1], dtype=float) * self.regularization_alpha
-                    inv = np.linalg.pinv((transformed.T @ transformed + regularization), rcond=1e-4)
-                    weights[time_index] = inv @ transformed.T @ self.option_price[in_the_money_indices]
+                    model = Ridge(alpha=self.regularization_alpha, fit_intercept=False)
+                    model.fit(transformed, self.option_price[in_the_money_indices])
+                    weights[time_index] = model.coef_ 
+                
                 continuation_value = transformed @ weights[time_index]
 
             indicator = discounted_payoff[in_the_money_indices, time_index] > continuation_value.reshape(-1)
