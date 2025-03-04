@@ -2,7 +2,6 @@ import numpy as np
 from tqdm import tqdm_notebook as tqdm
 from abstracts import SamplerAbstract
 
-
 class WienerRainbowPutOptionSampler(SamplerAbstract):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -44,7 +43,6 @@ class GeometricBrownianMotionPutSampler(SamplerAbstract):
         self.discount_factor = np.repeat(
             np.exp(- self.mu * self.time_grid).reshape((1, -1)), self.cnt_trajectories, axis=0
         )
-
 
 MODELS_TO_SAMPLER = {
     "WienerRainbowPutOptionSampler": WienerRainbowPutOptionSampler,

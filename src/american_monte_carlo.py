@@ -5,6 +5,7 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import Ridge  # Добавляем импорт Ridge
 from IPython.display import display, clear_output
 from dataclasses import dataclass
+from sklearn.preprocessing import StandardScaler
 
 from abstracts import PricerAbstract, SamplerAbstract
 
@@ -61,6 +62,7 @@ class PricerAmericanMonteCarlo(PricerAbstract):
 
         bar = tqdm(range(self.sampler.cnt_times - 2, -1, -1))
         for time_index in bar:
+            print(time_index)
             if time_index == 0:
                 continuation_value = np.ones(self.sampler.cnt_trajectories) * np.mean(self.option_price)
                 in_the_money_indices = np.arange(self.sampler.cnt_trajectories, dtype=int)
@@ -70,13 +72,21 @@ class PricerAmericanMonteCarlo(PricerAbstract):
                         len(in_the_money_indices) < 2 or test and weights[time_index] is None):
                     self.price_history[time_index] = self.option_price.mean()
                     continue
-                features = self.sampler.markov_state[in_the_money_indices, time_index]
+                features = self.sampler.markov_state[in_the_money_indices, time_index].copy()
+
+                scaler = StandardScaler()
+                features = scaler.fit_transform(features)
+                
+                # print("features shape", features.shape)
                 transformed = self.basis_functions_transformer.fit_transform(features)
+                # print("transformed shape", transformed.shape)
+                # print("transformed", transformed[:6, :])
+                # print("transformed cov", np.cov(transformed.T))
                 
                 if not test:
-                    model = Ridge(alpha=self.regularization_alpha, fit_intercept=False)
-                    model.fit(transformed, self.option_price[in_the_money_indices])
-                    weights[time_index] = model.coef_ 
+                    regularization = np.eye(transformed.shape[1], dtype=float) * self.regularization_alpha
+                    inv = np.linalg.pinv((transformed.T @ transformed + regularization), rcond=1e-10)
+                    weights[time_index] = inv @ transformed.T @ self.option_price[in_the_money_indices]
                 
                 continuation_value = transformed @ weights[time_index]
 
