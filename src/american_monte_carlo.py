@@ -90,7 +90,7 @@ class PricerAmericanMonteCarlo(PricerAbstract):
             indicator = discounted_payoff[in_the_money_indices, time_index] > continuation_value
             self.option_price[in_the_money_indices] = \
                 (indicator * discounted_payoff[in_the_money_indices, time_index].copy() +
-                 ~indicator * continuation_value) # тут неправильно использовать CV. CV получен как предикт и поэтому будет получаться накоп ошибок
+                 ~indicator * self.option_price[in_the_money_indices]) # тут неправильно использовать CV. CV получен как предикт и поэтому будет получаться накоп ошибок
             
             self.price_history[time_index] = self.option_price.mean()
             if not quiet and time_index % 10 == 0:
