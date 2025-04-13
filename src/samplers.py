@@ -38,19 +38,31 @@ class GeometricBrownianMotionPutSampler(SamplerAbstract):
         self.t = kwargs.get("t", 1)             
 
     def sample(self) -> None:
+        # normals - 2-d array of size (cnt_trajectories, cnt_times - 1)
+        #           with values from normal distribution in each cell.
         normals = self.random_state.normal(0, 1, (self.cnt_trajectories, self.cnt_times - 1))
+        # markov_state - 2-d array (only one row in third dimension) of size (cnt_trajectories, cnt_times). Each row is
+        #                a separate trajectory of the markov process based on the GBM. First cell in each trajectory
+        #                equals the price of asset.
         self.markov_state = np.zeros((self.cnt_trajectories, self.cnt_times, 1), dtype=float)
         self.markov_state[:, 0, 0] = self.asset0
-        
-        # 
+
         for t in tqdm(range(1, self.cnt_times)):
             dt = self.time_deltas[t - 1]
+            # markov_state[:, t, 0] - a 1-d vector of size (cnt_trajectories). Every cell is a combination of
+            #                         the previous state from the trajectory and GBM coefficient
             self.markov_state[:, t, 0] = self.markov_state[:, t - 1, 0] * np.exp(
                 (self.r - 0.5 * self.sigma ** 2) * dt + self.sigma * np.sqrt(dt) * normals[:, t - 1]
             )
-        
+
+        # payoff - 2-d array of size (cnt_trajectories, cnt_times). Every cell shows the difference between
+        #          the option's strike price and the generated markov_state
         self.payoff = np.clip(self.strike - self.markov_state[:, :, 0], 0, 1e20)
 
+        # time_grid - 1-d vector of size (cnt_times).
+        #             By default, equals [0, 1, 2, ..., t]
+        # discount_factor - 2-d array of size (cnt_trajectories, cnt_times). All rows are equal. Every row equals
+        #                   [e^0, e^(-r), e^(-2r) ..., e^(-tr)]
         self.discount_factor = np.repeat(
             np.exp(-self.r * self.time_grid).reshape((1, -1)), self.cnt_trajectories, axis=0
         )
