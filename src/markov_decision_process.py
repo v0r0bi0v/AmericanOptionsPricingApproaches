@@ -118,7 +118,6 @@ class MarkovDecisionProcess(ABC, Generic[S, A]):
 ActionMapping = Mapping[A, StateReward[S]]
 StateActionMapping = Mapping[NonTerminal[S], ActionMapping[A, S]]
 
-
 class FiniteMarkovDecisionProcess(MarkovDecisionProcess[S, A]):
     '''A Markov Decision Process with finite state and action spaces.
 
