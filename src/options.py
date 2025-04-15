@@ -32,7 +32,7 @@ class Option:
         self.underlying = underlying
         self.dividend_yield = dividend_yield or 0
 
-        self.qty = qty
+        self.qty = qty # это количество опционов
         self.strike_price = strike_price
         self.expiration_date = expiration_date
 
