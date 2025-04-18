@@ -74,12 +74,12 @@ class LSPIPricer(PricerAbstract):
             b = np.zeros(d, dtype=float)
 
             # ptg,d -> pt эквивалентно sum_{d} (phi[p, t, d] * w[d])
-
             Q_cont_next = np.einsum('ptd,d->pt', phi_next_all, w)
             Q_ex_next = disc_matrix[:, 1:] * payoff_matrix[:, 1:]
 
             non_terminal_s_prime = np.tile((np.arange(num_times - 1) < num_times - 2)[np.newaxis, :], (num_paths, 1))
 
+            # тут происходит Policy Improvement
             next_cont_cond = non_terminal_s_prime & (Q_cont_next >= Q_ex_next - self.epsilon)
             diff_phi = phi_curr_all - next_cont_cond[:, :, None] * gamma * phi_next_all
 
@@ -87,6 +87,7 @@ class LSPIPricer(PricerAbstract):
             b += np.einsum('ptd,pt->d', phi_curr_all, (~next_cont_cond) * gamma * payoff_matrix[:, 1:])
 
             A += self.lambda_reg * np.eye(d)
+            # пересчёт матриц A и вектора b и обновление весов это шаг Policy Evaluation в GPI
             w = np.linalg.solve(A, b)
 
             if np.linalg.norm(w - prev_w) < self.tol:
