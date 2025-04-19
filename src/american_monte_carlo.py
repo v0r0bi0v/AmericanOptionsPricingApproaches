@@ -13,7 +13,7 @@ def _plot_progress(sampler, bar, price_history, lower_bound, upper_bound, ax=Non
     clear_output(wait=True)
     display(bar.container)
     if ax is None:
-        ax = plt.gca()  # Используем текущий график, если ax не передан
+        ax = plt.gca()
     ax.ticklabel_format(style='plain', useOffset=False)
     ax.plot(sampler.time_grid, price_history)
     ax.plot(sampler.time_grid, lower_bound, "--")
@@ -23,7 +23,7 @@ def _plot_progress(sampler, bar, price_history, lower_bound, upper_bound, ax=Non
     ax.set_xlabel("$t$")
     ax.set_ylabel("price")
     ax.grid()
-    # Убираем plt.show(), так как мы работаем с конкретным подграфиком
+
 
 @dataclass
 class AmericanMonteCarloResult:
@@ -44,16 +44,18 @@ class PricerAmericanMonteCarlo(PricerAbstract):
         self.price_history: np.ndarray | None = None
         self.option_price: np.ndarray | None = None
         self.result = {}
+        self.weights: list = []
 
-    def price(self, test=False, quiet=False, ax=None):  # Добавлен параметр ax
+    def price(self, test=False, quiet=False, ax=None):
         self.sampler.sample()
+        discounted_payoff = self.sampler.payoff * self.sampler.discount_factor
         # if not quiet:
         #     self.sampler.plot(cnt=10, plot_mean=True, y="payoff, discount_factor, markov_state")
-        
-        discounted_payoff = self.sampler.payoff * self.sampler.discount_factor
 
         self.option_price = discounted_payoff[:, -1].copy()
-        weights = [None] * self.sampler.cnt_times
+
+        if not test:
+            self.weights = [None] * self.sampler.cnt_times
         self.price_history = [None] * (self.sampler.cnt_times - 1) + [self.option_price.mean()]
 
         lower_bound = np.zeros(self.sampler.cnt_times)
@@ -70,7 +72,7 @@ class PricerAmericanMonteCarlo(PricerAbstract):
             else:
                 in_the_money_indices = np.where(discounted_payoff[:, time_index] > 1e-9)[0]
                 if (len(in_the_money_indices) / self.sampler.cnt_trajectories < 1e-2 or
-                        len(in_the_money_indices) < 2 or test and weights[time_index] is None):
+                        len(in_the_money_indices) < 2 or test and self.weights[time_index] is None):
                     self.price_history[time_index] = self.option_price.mean()
                     continue
                 features = self.sampler.markov_state[in_the_money_indices, time_index].copy()
@@ -83,9 +85,10 @@ class PricerAmericanMonteCarlo(PricerAbstract):
                 if not test:
                     regularization = np.eye(transformed.shape[1], dtype=float) * self.regularization_alpha
                     inv = np.linalg.pinv((transformed.T @ transformed + regularization), rcond=1e-10)
-                    weights[time_index] = inv @ transformed.T @ self.option_price[in_the_money_indices]
+                    self.weights[time_index] = inv @ transformed.T @ self.option_price[
+                        in_the_money_indices]
                 
-                continuation_value = transformed @ weights[time_index]
+                continuation_value = transformed @ self.weights[time_index]
 
             indicator = discounted_payoff[in_the_money_indices, time_index] > continuation_value
             self.option_price[in_the_money_indices] = \
