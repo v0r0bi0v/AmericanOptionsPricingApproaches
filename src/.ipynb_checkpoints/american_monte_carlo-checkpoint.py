@@ -13,7 +13,7 @@ def _plot_progress(sampler, bar, price_history, lower_bound, upper_bound, ax=Non
     clear_output(wait=True)
     display(bar.container)
     if ax is None:
-        ax = plt.gca()  # Используем текущий график, если ax не передан
+        ax = plt.gca()
     ax.ticklabel_format(style='plain', useOffset=False)
     ax.plot(sampler.time_grid, price_history)
     ax.plot(sampler.time_grid, lower_bound, "--")
@@ -23,7 +23,7 @@ def _plot_progress(sampler, bar, price_history, lower_bound, upper_bound, ax=Non
     ax.set_xlabel("$t$")
     ax.set_ylabel("price")
     ax.grid()
-    # Убираем plt.show(), так как мы работаем с конкретным подграфиком
+
 
 @dataclass
 class AmericanMonteCarloResult:
@@ -46,7 +46,7 @@ class PricerAmericanMonteCarlo(PricerAbstract):
         self.result = {}
         self.weights: list = []
 
-    def price(self, test=False, quiet=False, ax=None):  # Добавлен параметр ax
+    def price(self, test=False, quiet=False, ax=None):
         self.sampler.sample()
         discounted_payoff = self.sampler.payoff * self.sampler.discount_factor
         # if not quiet:
