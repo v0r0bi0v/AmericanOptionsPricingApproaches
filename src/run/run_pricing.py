@@ -10,9 +10,14 @@ from src.run.samplers_params import PARAMS as SAMPLERS_PARAMS
 from src.run.pricers_params import PARAMS as PRICERS_PARAMS
 
 SAMPLER_NAME = "GeometricBrownianMotionPutSampler"
-PRICER_NAME = "LSPIPricer"
-CNT_REPEATS = 12
-CNT_TRAJECTORIES = np.linspace(1_000, 100_000, 10, dtype=int)
+assert SAMPLER_NAME in ["GeometricBrownianMotionPutSampler", "WienerRainbowPutOptionSampler"]
+
+PRICER_NAME = "AmericanMonteCarloPricer"
+assert PRICER_NAME in ["BinomialTreePricer", "LSPIPricer", "AmericanMonteCarloPricer"]
+
+
+CNT_REPEATS = 144
+CNT_TRAJECTORIES = np.linspace(1_000, 100_000, 2, dtype=int)
 
 SAVES_DIR = "0"
 
