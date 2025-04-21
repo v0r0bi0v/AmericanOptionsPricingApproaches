@@ -51,6 +51,8 @@ class AmericanMonteCarloPricer(PricerAbstract):
     def price(self, test=False, quiet=False, ax=None):
         self.sampler.sample()
         discounted_payoff = self.sampler.payoff * self.sampler.discount_factor
+        # TODO: Вот так к сожалению в общем случае лучше не делать (если DiscountFactor стохастический)
+        
         # if not quiet:
         #     self.sampler.plot(cnt=10, plot_mean=True, y="payoff, discount_factor, markov_state")
 
@@ -66,7 +68,7 @@ class AmericanMonteCarloPricer(PricerAbstract):
             lower_bound[i] = discounted_payoff[:, i:].mean(axis=0).max()
             upper_bound[i] = discounted_payoff[:, i:].max(axis=1).mean()
 
-        bar = tqdm(range(self.sampler.cnt_times - 2, -1, -1))
+        bar = tqdm(range(self.sampler.cnt_times - 2, -1, -1), desc=f"AMC price {'test' if test else 'train'}")
         for time_index in bar:
             if time_index == 0:
                 continuation_value = np.ones(self.sampler.cnt_trajectories) * np.mean(self.option_price)

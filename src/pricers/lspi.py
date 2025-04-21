@@ -44,7 +44,7 @@ class LSPIPricer(PricerAbstract):
 
         return phi_final
 
-    def price(self, test=False) -> np.ndarray:
+    def price(self, test=False, quiet=None) -> np.ndarray:
 
         self.sampler.sample()
 

@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from utils.plotting_utils import plot_trajectories
+from src.utils.plotting_utils import plot_trajectories
 import warnings
 import numpy as np
 

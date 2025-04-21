@@ -1,6 +1,6 @@
-from pricers.lspi import LSPIPricer
-from pricers.american_monte_carlo import AmericanMonteCarloPricer
-from pricers.binomial_tree import BinomialTreePricer
+from src.pricers.lspi import LSPIPricer
+from src.pricers.american_monte_carlo import AmericanMonteCarloPricer
+from src.pricers.binomial_tree import BinomialTreePricer
 
 NAME_TO_PRICER = {
     "LSPIPricer": LSPIPricer,

@@ -10,8 +10,12 @@ class BinomialTreePricer(PricerAbstract):
     def __init__(self, sampler: SamplerAbstract):
         self.sampler = sampler
         
-        if type(sampler).__name__ != "GeometricBrownianMotionPutSampler":
-            raise ValueError("Sampler must be a GeometricBrownianMotionPutSampler for BinomialTreePricer")
+        if type(sampler).__name__ == "GeometricBrownianMotionPutSampler":
+            pass
+        elif type(sampler).__name__ == "GeometricBrownianMotionCallSampler":
+            pass
+        else:
+            raise ValueError("Sampler must be based on GeometricBrownianMotion for BinomialTreePricer")
 
     
     def plot_expected_prices(self):

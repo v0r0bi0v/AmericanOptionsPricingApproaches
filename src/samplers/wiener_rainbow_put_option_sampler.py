@@ -1,6 +1,6 @@
 import numpy as np
 from tqdm.auto import tqdm
-from abstract_sampler import SamplerAbstract
+from src.samplers.abstract_sampler import SamplerAbstract
 
 
 class WienerRainbowPutOptionSampler(SamplerAbstract):
@@ -17,7 +17,7 @@ class WienerRainbowPutOptionSampler(SamplerAbstract):
         self.markov_state = np.zeros((self.dim, self.cnt_trajectories, self.cnt_times), dtype=float)
         
         for i in range(self.dim):
-            for j in tqdm(range(self.cnt_trajectories)):
+            for j in tqdm(range(self.cnt_trajectories), desc="WienerRainbow sampling"):
                 self.markov_state[i][j] = np.zeros(len(self.time_deltas) + 1, dtype=float)
                 self.markov_state[i][j][1:] = self.sigmas[i] * np.cumsum(normals[i][j] * np.sqrt(self.time_deltas))
         
