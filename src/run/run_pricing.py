@@ -1,7 +1,7 @@
-from samplers.samplers import NAME_TO_SAMPLER
-from pricers.pricers import NAME_TO_PRICER
-from samplers_params import PARAMS as SAMPLERS_PARAMS
-from pricers_params import PARAMS as PRICERS_PARAMS
+from src.samplers.samplers import NAME_TO_SAMPLER
+from src.pricers.pricers import NAME_TO_PRICER
+from src.run.samplers_params import PARAMS as SAMPLERS_PARAMS
+from src.run.pricers_params import PARAMS as PRICERS_PARAMS
 
 sampler_name = "GeometricBrownianMotionPutSampler"
 pricer_name = "AmericanMonteCarloPricer"

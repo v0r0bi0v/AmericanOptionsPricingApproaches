@@ -1,13 +1,15 @@
 import numpy as np
 from matplotlib import pyplot as plt
-from tqdm import tqdm_notebook as tqdm
+from tqdm.auto import tqdm
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import Ridge
 from IPython.display import display, clear_output
 from dataclasses import dataclass
 from sklearn.preprocessing import StandardScaler
 
-from abstracts import PricerAbstract, SamplerAbstract
+from src.pricers.abstract_pricer import PricerAbstract
+from src.samplers.abstract_sampler import SamplerAbstract
+
 
 def _plot_progress(sampler, bar, price_history, lower_bound, upper_bound, ax=None):
     clear_output(wait=True)
@@ -85,8 +87,7 @@ class AmericanMonteCarloPricer(PricerAbstract):
                 if not test:
                     regularization = np.eye(transformed.shape[1], dtype=float) * self.regularization_alpha
                     inv = np.linalg.pinv((transformed.T @ transformed + regularization), rcond=1e-10)
-                    self.weights[time_index] = inv @ transformed.T @ self.option_price[
-                        in_the_money_indices]
+                    self.weights[time_index] = inv @ transformed.T @ self.option_price[in_the_money_indices]
                 
                 continuation_value = transformed @ self.weights[time_index]
 

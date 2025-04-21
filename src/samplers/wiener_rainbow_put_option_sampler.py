@@ -1,5 +1,5 @@
 import numpy as np
-from tqdm.notebook import tqdm_notebook as tqdm
+from tqdm.auto import tqdm
 from abstract_sampler import SamplerAbstract
 
 

@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from utils.plotting_utils import plot_trajectories
 import numpy as np
 
 
