@@ -56,6 +56,7 @@ class AmericanMonteCarloPricer(PricerAbstract):
         # if not quiet:
         #     self.sampler.plot(cnt=10, plot_mean=True, y="payoff, discount_factor, markov_state")
 
+        # option_price - 1-d array of size (cnt_trajectories). Copies the last payoff from each trajectory
         self.option_price = discounted_payoff[:, -1].copy()
 
         if not test:
