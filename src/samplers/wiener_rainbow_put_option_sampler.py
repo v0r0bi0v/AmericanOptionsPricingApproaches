@@ -17,7 +17,7 @@ class WienerRainbowPutOptionSampler(SamplerAbstract):
         self.markov_state = np.zeros((self.dim, self.cnt_trajectories, self.cnt_times), dtype=float)
         
         for i in range(self.dim):
-            self.markov_state[i, :, 0] = self.asset0[i]  # Установка начальной цены
+            self.markov_state[i, :, 0] = self.asset0[i]
             for j in tqdm(range(self.cnt_trajectories), desc="WienerRainbow sampling with asset0"):
                 self.markov_state[i][j][1:] = self.asset0[i] * np.exp(
                     (-0.5 * self.sigmas[i]**2) * self.time_deltas +
