@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Optional
 from sklearn.preprocessing import StandardScaler
-from pricers.abstract_pricer import PricerAbstract
+from pricers.abstract_pricer   import PricerAbstract
 from samplers.abstract_sampler import SamplerAbstract
 
 
@@ -20,11 +20,11 @@ class LSPIPricer(PricerAbstract):
         self.sampler = sampler
 
     def _basis_functions(self, S: np.ndarray, K: float, t: np.ndarray, T: float) -> np.ndarray:
-        if S.shape[2] > 1:  # rainbow случай
+        if S.shape[2] > 1: # rainbow случай
             min_S = np.min(S, axis=2)  # (num_paths, num_times)
-        else:
+        else: 
             min_S = S[:, :, 0]  # (num_paths, num_times)
-
+        
         M = min_S / K
         exp_term = np.exp(-M / 2.0)
 
@@ -48,7 +48,7 @@ class LSPIPricer(PricerAbstract):
 
         return phi_final
 
-    def price(self, test=False) -> np.ndarray:
+    def price(self, test = False) -> np.ndarray:
         self.sampler.sample()
 
         K = self.sampler.strike
@@ -75,6 +75,7 @@ class LSPIPricer(PricerAbstract):
                 prev_w = w.copy()
                 A = np.zeros((d, d), dtype=float)
                 b = np.zeros(d, dtype=float)
+
 
                 # phi_next_all размера num_paths × (num_times-1) × d) умножается на w размера d
                 # и получается результат размера num_paths × (num_times-1)
