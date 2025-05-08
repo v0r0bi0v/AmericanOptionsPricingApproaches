@@ -105,7 +105,6 @@ class LSPIPricer(PricerAbstract):
                     break
             self.w = w.copy()
         else:
-
             w = self.w
 
         pv_payoffs = np.zeros(num_paths, dtype=float)
