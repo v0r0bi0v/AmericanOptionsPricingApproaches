@@ -3,3 +3,4 @@ __pycache__/
 saves/
 output.log
 .DS_Store
+.venv/

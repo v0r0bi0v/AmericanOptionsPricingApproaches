@@ -196,4 +196,4 @@ def update_graphs(selected_sampler, yaxis_scale):
     return price_fig, std_fig
 
 if __name__ == '__main__':
-    app.run_server(debug=False, host="127.0.0.1", port=7777)
+    app.run(debug=False, host="127.0.0.1", port=7777)
