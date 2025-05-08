@@ -1,0 +1,122 @@
+\documentclass[8pt]{article}
+
+\usepackage[russian,english]{babel}
+
+\usepackage{cmap}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsfonts}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{color}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{pdfpages}
+\usepackage{forest}
+\usepackage{adjustbox}
+\usepackage{times}
+\usepackage{tikz}
+
+\usepackage{minted} % для кода
+\usepackage{listings} % для кода
+
+\usepackage[style=numeric,backend=biber,maxbibnames=99]{biblatex}
+\addbibresource{paper.bib}
+
+\renewcommand*{\finalnamedelim}{\addcomma\space}
+\renewcommand*{\finalnamedelim}{\addcomma\space}
+
+\lstset{ % для кода
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt,
+    backgroundcolor=\color{white},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4,
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=true,
+    escapeinside={\%*}{*)}
+}
+
+% \mode<presentation>{
+%     \usetheme{Marburg}
+%     \usecolortheme{sidebartab}
+% }
+
+% \newtheorem{theorem}{Theorem}[section]
+% \newtheorem{lemma}{Lemma}[section]
+% \newtheorem{proposition}{Proposition}[section]
+% \newtheorem{corollary}{Corollary}[section]
+% \newtheorem{definition}{Definition}[section]
+% \newtheorem{remark}{Remark}[section]
+% \newtheorem{example}{Example}[section]
+
+\newcommand{\E}{\ensuremath{\mathbb{E}}}
+\newcommand{\D}{\ensuremath{\mathbb{D}}}
+\renewcommand{\C}{\ensuremath{\mathbb{C}}}
+\newcommand{\R}{\ensuremath{\mathbb{R}}}
+\newcommand{\Q}{\ensuremath{\mathbb{Q}}}
+\newcommand{\Z}{\ensuremath{\mathbb{Z}}}
+\renewcommand{\|}{\ensuremath{\hspace{0.1cm} | \hspace{0.1cm}}}
+
+\newcommand{\red}[1]{\textcolor{red}{#1}}
+\newcommand{\blue}[1]{\textcolor{blue}{#1}}
+\newcommand{\green}[1]{\textcolor{green}{#1}}
+\newcommand{\orange}[1]{\textcolor{orange}{#1}}
+\newcommand{\teal}[1]{\textcolor{teal}{#1}}
+\newcommand{\purple}[1]{\textcolor{purple}{#1}}
+
+\newcommand{\todo}{\red{TODO}}
+
+\renewcommand{\phi}{\varphi}
+\renewcommand{\epsilon}{\varepsilon}
+\renewcommand{\le}{\leqslant}
+\renewcommand{\ge}{\geqslant}
+
+
+\begin{document}
+    \title{American Options Pricing Approaches}
+
+    \date{\today}
+
+    \maketitle
+
+    \input{sections/abstract}
+
+    \tableofcontents
+
+    \section{Introduction}
+        \input{sections/introduction}
+
+    \section{Least-Squares Monte Carlo \cite{LSMC}}
+        \input{sections/lsmc}
+
+    \section{RL methods}
+        \input{sections/rl-methods}
+
+    \section{Upper Bound (via dual problem)}
+        \input{sections/upper-bound}
+
+
+    \section{RL vs LSMC}
+        \input{sections/rl-vs-lsmc}
+
+    \section{Appendix}
+        \subsection{Special case: Loan Pricing (with early prepayment option)}
+            \input{sections/loan-pricing}
+
+        \subsection{Improving convergence}
+            \input{sections/improving-convergence}
+
+    \nocite{*}
+    \printbibliography
+\end{document}
