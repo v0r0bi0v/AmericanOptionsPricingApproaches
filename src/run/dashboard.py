@@ -109,10 +109,11 @@ def update_graphs(selected_sampler, yaxis_scale):
         price_fig.add_trace(go.Scatter(
             x=cnt_trajectories,
             y=train_mean,
-            mode='lines',
+            mode='lines+markers',
             name=f'{pricer_name} (train)',
             line=dict(width=2, color=color),
             legendgroup=f'{pricer_name}_train',
+            marker=dict(size=10)
         ))
         
         # Train confidence interval
@@ -131,10 +132,11 @@ def update_graphs(selected_sampler, yaxis_scale):
         std_fig.add_trace(go.Scatter(
             x=cnt_trajectories,
             y=train_std,
-            mode='lines',
+            mode='lines+markers',
             name=f'{pricer_name} (train std)',
             line=dict(width=2, color=color),
             legendgroup=f'{pricer_name}_train_std',
+            marker=dict(size=10)
         ))
         
         # Add test data if available
@@ -147,10 +149,11 @@ def update_graphs(selected_sampler, yaxis_scale):
             price_fig.add_trace(go.Scatter(
                 x=cnt_trajectories,
                 y=test_mean,
-                mode='lines',
+                mode='lines+markers',
                 name=f'{pricer_name} (test)',
                 line=dict(width=2, dash='dot', color=color),
                 legendgroup=f'{pricer_name}_test',
+                marker=dict(size=10)
             ))
             
             # Test confidence interval
@@ -169,10 +172,11 @@ def update_graphs(selected_sampler, yaxis_scale):
             std_fig.add_trace(go.Scatter(
                 x=cnt_trajectories,
                 y=test_std,
-                mode='lines',
+                mode='lines+markers',
                 name=f'{pricer_name} (test std)',
                 line=dict(width=2, dash='dot', color=color),
                 legendgroup=f'{pricer_name}_test_std',
+                marker=dict(size=10)
             ))
     
     price_fig.update_layout(

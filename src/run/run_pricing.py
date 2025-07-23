@@ -12,12 +12,12 @@ from src.run.pricers_params import PARAMS as PRICERS_PARAMS
 SAMPLER_NAME = "GeometricBrownianMotionPutSampler"
 assert SAMPLER_NAME in ["GeometricBrownianMotionPutSampler", "WienerRainbowPutOptionSampler"]
 
-PRICER_NAME = "AmericanMonteCarloPricer"
+PRICER_NAME = "LSPIPricer"
 assert PRICER_NAME in ["BinomialTreePricer", "LSPIPricer", "AmericanMonteCarloPricer"]
 
 
-CNT_REPEATS = 144
-CNT_TRAJECTORIES = np.linspace(1_000, 100_000, 2, dtype=int)
+CNT_REPEATS = 1
+CNT_TRAJECTORIES = [100_000]  # np.linspace(1_000, 100_000, 5, dtype=int)
 
 SAVES_DIR = "0"
 
@@ -68,7 +68,9 @@ def run_pricing_multiple_times(test=True, quiet=False, num_cores=None):
             for repeat_idx in range(CNT_REPEATS)
         ]
         
-        results = Parallel(n_jobs=num_cores)(delayed(process_repeats)(args) for args in args_list)
+        results = Parallel(n_jobs=num_cores)(delayed(process_repeats)(args) for args in args_list) \
+            if len(args_list) > 1 \
+                else [process_repeats(args_list[0])]
         for repeat_idx, train_price, test_price in results:
             train_prices[traj_idx, repeat_idx] = train_price
             test_prices[traj_idx, repeat_idx] = test_price
@@ -82,4 +84,4 @@ def run_pricing_multiple_times(test=True, quiet=False, num_cores=None):
 
 
 if __name__ == "__main__":
-    run_pricing_multiple_times(test=True, quiet=True)
+    run_pricing_multiple_times(test=True, quiet=False)

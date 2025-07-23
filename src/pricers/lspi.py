@@ -1,124 +1,159 @@
+from copy import deepcopy
 import numpy as np
 from typing import Optional
 from sklearn.preprocessing import StandardScaler
-from ..pricers.abstract_pricer import PricerAbstract
-from ..samplers.abstract_sampler import SamplerAbstract
+from src.pricers.abstract_pricer import PricerAbstract
+from src.samplers.abstract_sampler import SamplerAbstract
 
+
+import numpy as np
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler
+from tqdm.auto import tqdm
 
 class LSPIPricer(PricerAbstract):
     def __init__(
-            self,
-            sampler: SamplerAbstract,
-            iterations: int = 20,
-            tol: float = 1e-5,
-            lambda_reg: float = 1e-1,
+        self,
+        sampler: SamplerAbstract,
+        degree: int = 3,
+        iterations: int = 20,
+        tol: float = 1e-5,
+        lambda_reg: float = 1e-1,
     ):
+        self.sampler = sampler
+        self.degree = degree
         self.iterations = iterations
         self.tol = tol
         self.lambda_reg = lambda_reg
-        self.w: Optional[np.ndarray] = None
-        self.sampler = sampler
+        self.w: np.ndarray | None = None
+        self.is_fitted_ = False  # Флаг обученности трансформеров
 
-    def _basis_functions(self, S: np.ndarray, K: float, t: np.ndarray, T: float) -> np.ndarray:
-        M = S / K
-        exp_term = np.exp(-M / 2.0)
+        # Проверка равномерности временной сетки
+        dt = self.sampler.time_deltas[0]
+        assert np.allclose(np.diff(sampler.time_grid), dt), "Time grid must be uniform"
+        self.dt = dt
 
-        phi = np.zeros((*S.shape, 7), dtype = float)
-        phi[:, :, 0] = 1.0
-        phi[:, :, 1] = exp_term
-        phi[:, :, 2] = exp_term * (1.0 - M)
-        phi[:, :, 3] = exp_term * (1.0 - 2.0 * M + 0.5 * M * M)
-        phi[:, :, 4] = np.sin(np.pi * (T - t) / (2.0 * T))
-        phi[:, :, 5] = np.log(np.maximum(T - t, 1e-10)) # 1e-10 чтобы не было log(0)
-        phi[:, :, 6] = (t / T) ** 2
+    def _create_features(self, markov_state: np.ndarray, time_grid: np.ndarray) -> np.ndarray:
+        """Создает полиномиальные признаки из марковского состояния и времени"""
+        n_paths, n_times, state_dim = markov_state.shape
+        T = time_grid[-1]
+        
+        # Нормализованное время до экспирации
+        time_to_exp = (T - time_grid) / T
+        time_to_exp = np.tile(time_to_exp, (n_paths, 1))[..., None]
+        
+        # Объединяем время и состояние
+        features = np.concatenate([time_to_exp, markov_state], axis=-1)
+        flat_features = features.reshape(-1, features.shape[-1])
+        
+        # Первый вызов - инициализируем и фитим трансформеры
+        if not self.is_fitted_:
+            self.scaler_ = StandardScaler()
+            self.poly_ = PolynomialFeatures(degree=self.degree, include_bias=True)
+            
+            scaled = self.scaler_.fit_transform(flat_features)
+            poly_features = self.poly_.fit_transform(scaled)
+            self.n_features_ = poly_features.shape[1]
+            self.is_fitted_ = True
+        else:
+            # Используем обученные трансформеры
+            scaled = self.scaler_.transform(flat_features)
+            poly_features = self.poly_.transform(scaled)
+        
+        return poly_features.reshape(n_paths, n_times, -1)
 
-        scaler = StandardScaler()
-        phi_reshaped = phi[:, :, 1:].reshape(-1, 6)
-        phi_scaled = scaler.fit_transform(phi_reshaped)
-        phi_scaled = phi_scaled.reshape(phi.shape[0], phi.shape[1], 6)
-
-
-        phi_final = np.zeros_like(phi)
-        phi_final[:, :, 0] = phi[:, :, 0]
-        phi_final[:, :, 1:] = phi_scaled
-
-        return phi_final
-
-    def price(self, test=False, quiet=None) -> np.ndarray:
-
+    def price(self, test: bool = False, quiet: bool = False) -> np.ndarray:
+        # Генерация путей
         self.sampler.sample()
 
-        K = self.sampler.strike
-        r = self.sampler.r
-        time_grid = self.sampler.time_grid
-        T = time_grid[-1]
-        dt = time_grid[1] - time_grid[0]
-        gamma = np.exp(-r * dt)
-        S_paths = self.sampler.markov_state[:, :, 0]
-        payoff_matrix = self.sampler.payoff
-        disc_matrix = self.sampler.discount_factor
-        num_paths, num_times = S_paths.shape
-        d = 7
-
-        time_grid_expanded = np.tile(time_grid, (num_paths, 1))
-        phi_all = self._basis_functions(S_paths, K, time_grid_expanded, T)
-
-        if not test:
-
-            w = np.zeros(d, dtype=float) if self.w is None else self.w.copy()
-
-            phi_curr_all = phi_all[:, :-1, :]# базисные ф-ии кроме терминального состояния, phi(s_i)
-            phi_next_all = phi_all[:, 1:, :]# базисные ф-ии кроме начального состояния, phi(s_i')
-
-
-            for it in range(self.iterations):
-                prev_w = w.copy()
-                A = np.zeros((d, d), dtype=float)
-                b = np.zeros(d, dtype=float)
-
-                # phi_next_all размера num_paths × (num_times-1) × d) умножается на w размера d
-                # и получается результат размера num_paths × (num_times-1)
-                # соответствует phi(s_i') * w для каждой траектории p и для каждого времени t
-                Q_cont_next = np.einsum('ptd,d->pt', phi_next_all, w)
-
-                Q_ex_next = disc_matrix[:, 1:] * payoff_matrix[:, 1:]
-
-                non_terminal_s_prime = np.tile(
-                    (np.arange(num_times - 1) < num_times - 2)[np.newaxis, :], (num_paths, 1)
-                )
-
-                next_cont_cond = non_terminal_s_prime & (Q_cont_next >= Q_ex_next)
-
-                # diff_phi - это phi(s_i) - Indicator(C_1) * gamma * phi(s_i')
-                diff_phi = phi_curr_all - next_cont_cond[:, :, None] * gamma * phi_next_all
-
-                A += np.einsum('ptd,pte->de', phi_curr_all, diff_phi)
-                b += np.einsum('ptd,pt->d', phi_curr_all, (~next_cont_cond) * Q_ex_next)
-
-                A += self.lambda_reg * np.eye(d)
-                w, _, _, _ = np.linalg.lstsq(A, b, rcond = None)
-
-                diff = np.linalg.norm(w - prev_w)
-                print(f"на {it}-ой итерации норма разности весов составила {round(diff, 4)}")
-                
-                if diff < self.tol:
-                    break
-            self.w = w.copy()
+        r = -np.log(self.sampler.discount_factor[0, 1] / self.sampler.discount_factor[0, 0]) / (self.sampler.time_deltas[0])
+        
+        assert np.allclose(
+            self.sampler.discount_factor,
+            np.repeat(
+                np.exp(-r * self.sampler.time_grid)[np.newaxis],
+                repeats=self.sampler.discount_factor.shape[0],
+                axis=0
+            )
+        ), "Discount factor cannot be stochastic yet"
+        
+        # Параметры
+        n_paths, n_times, _ = self.sampler.markov_state.shape
+        gamma = np.exp(-r * self.dt)  # Коэффициент дисконтирования
+        
+        # Создаем признаки
+        phi_all = self._create_features(
+            self.sampler.markov_state, 
+            self.sampler.time_grid
+        )
+        n_features = phi_all.shape[-1]
+        
+        # Инициализация весов
+        if self.w is None or not test:
+            w = np.zeros(n_features) if self.w is None else self.w.copy()
         else:
             w = self.w
 
-        pv_payoffs = np.zeros(num_paths, dtype=float)
-        for p in range(num_paths):
-            for t_idx in range(num_times):
-                payoff_now = payoff_matrix[p, t_idx]
-                disc_factor = disc_matrix[p, t_idx]
-                if t_idx == num_times - 1:
-                    pv_payoffs[p] = disc_factor * payoff_now
+        # Режим обучения
+        if not test:
+            # Подготовка данных
+            phi_curr = phi_all[:, :-1, :]  # Текущие состояния (t)
+            phi_next = phi_all[:, 1:, :]    # Следующие состояния (t+1)
+            payoff_next = self.sampler.payoff[:, 1:]  # Выплаты в t+1
+            
+            # Выравнивание в 1D
+            phi_curr_flat = phi_curr.reshape(-1, n_features)
+            phi_next_flat = phi_next.reshape(-1, n_features)
+            payoff_next_flat = payoff_next.reshape(-1)
+            
+            # Флаг нетерминальных состояний
+            non_terminal = np.tile(np.arange(n_times-1) < n_times-2, (n_paths, 1))
+            non_terminal_flat = non_terminal.reshape(-1)
+            
+            # Итерации LSPI
+            for it in range(self.iterations):
+                prev_w = deepcopy(w)
+                
+                # Вычисляем Q-значения продолжения
+                Q_cont_next = phi_next_flat @ w
+                
+                # Условие продолжения
+                continue_cond = non_terminal_flat & (Q_cont_next >= payoff_next_flat)
+                
+                # Формируем систему уравнений
+                diff_phi = phi_curr_flat - gamma * continue_cond[:, None] * phi_next_flat
+                A = phi_curr_flat.T @ diff_phi
+                b = phi_curr_flat.T @ (gamma * (1 - continue_cond) * payoff_next_flat)
+                
+                try:
+                    w = np.linalg.solve(A, b)
+                except np.linalg.LinAlgError:
+                    A_reg = A + self.lambda_reg * np.eye(n_features)
+                    w = np.linalg.lstsq(A_reg, b, rcond=None)[0]
+                
+                # Проверка сходимости
+                diff_norm = np.linalg.norm(w - prev_w)
+                if not quiet:
+                    print(f"Iteration {it}: ||Δw|| = {diff_norm:.9f}")
+                if diff_norm < self.tol:
+                    if not quiet:
+                        print(f"Converged after {it} iterations")
                     break
-                Q_cont = np.dot(phi_all[p, t_idx], w)
-                continuation_value = Q_cont
-                if payoff_now >= continuation_value:
-                    pv_payoffs[p] = disc_factor * payoff_now
-                    break
+            
+            self.w = w
 
+        # Оценка политики
+        pv_payoffs = np.zeros(n_paths)
+        for p in range(n_paths):
+            for t in range(n_times):
+                # Признаки текущего состояния
+                phi_t = phi_all[p, t]
+                Q_cont = phi_t @ w
+                payoff_t = self.sampler.payoff[p, t]
+                
+                # Условие исполнения
+                if payoff_t >= Q_cont or t == n_times - 1:
+                    disc_factor = self.sampler.discount_factor[p, t]
+                    pv_payoffs[p] = disc_factor * payoff_t
+                    break
+        
         return pv_payoffs

@@ -35,10 +35,10 @@ class SamplerAbstract:
         pass
 
     def plot(
-            self,
-            cnt: int,
-            plot_mean: False = False,
-            y: str = "payoff"
+        self,
+        cnt: int,
+        plot_mean: False = False,
+        y: str = "payoff"
     ):
         if "markov_state" in y:
             if self.markov_state.shape[2] != 1:
