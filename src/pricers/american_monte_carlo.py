@@ -47,6 +47,7 @@ class AmericanMonteCarloPricer(PricerAbstract):
         self.option_price: np.ndarray | None = None
         self.result = {}
         self.weights: list = []
+        self.scalers: list = []
 
     def price(self, test=False, quiet=False, ax=None):
         self.sampler.sample()
@@ -61,6 +62,7 @@ class AmericanMonteCarloPricer(PricerAbstract):
 
         if not test:
             self.weights = [None] * self.sampler.cnt_times
+            self.scalers = [None] * self.sampler.cnt_times
         self.price_history = [None] * (self.sampler.cnt_times - 1) + [self.option_price.mean()]
 
         lower_bound = np.zeros(self.sampler.cnt_times)
@@ -82,8 +84,10 @@ class AmericanMonteCarloPricer(PricerAbstract):
                     continue
                 features = self.sampler.markov_state[in_the_money_indices, time_index].copy()
 
-                scaler = StandardScaler()
-                features = scaler.fit_transform(features)
+                if not test:
+                    self.scalers[time_index] = StandardScaler()
+                    self.scalers[time_index].fit(features)
+                features = self.scalers[time_index].transform(features)
                 
                 transformed = self.basis_functions_transformer.fit_transform(features)
                 
