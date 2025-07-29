@@ -16,10 +16,10 @@ PRICER_NAME = "LSPIPricer"
 assert PRICER_NAME in ["BinomialTreePricer", "LSPIPricer", "AmericanMonteCarloPricer"]
 
 
-CNT_REPEATS = 1
-CNT_TRAJECTORIES = [100_000]  # np.linspace(1_000, 100_000, 5, dtype=int)
+CNT_REPEATS = 8
+CNT_TRAJECTORIES = np.linspace(1_000, 100_000, 5, dtype=int)
 
-SAVES_DIR = "0"
+SAVES_DIR = "3"
 
 save_dir = os.path.join(os.path.dirname(__file__), "..", "..", "saves", SAVES_DIR)
 os.makedirs(save_dir, exist_ok=True)
@@ -84,4 +84,4 @@ def run_pricing_multiple_times(test=True, quiet=False, num_cores=None):
 
 
 if __name__ == "__main__":
-    run_pricing_multiple_times(test=True, quiet=False)
+    run_pricing_multiple_times(test=True, quiet=True)

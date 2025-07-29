@@ -7,7 +7,7 @@ import os
 import glob
 import plotly.colors
 
-SAVES_DIR = "0"
+SAVES_DIR = "3"
 
 # Load all saved pricing results
 save_dir = os.path.join(os.path.dirname(__file__), "..", "..", "saves", SAVES_DIR)
@@ -200,4 +200,4 @@ def update_graphs(selected_sampler, yaxis_scale):
     return price_fig, std_fig
 
 if __name__ == '__main__':
-    app.run(debug=False, host="127.0.0.1", port=7777)
+    app.run(debug=False, host="127.0.0.1", port=7778)
