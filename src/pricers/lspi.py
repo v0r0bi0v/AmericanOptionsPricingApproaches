@@ -2,8 +2,9 @@ from copy import deepcopy
 import numpy as np
 from typing import Optional
 from sklearn.preprocessing import StandardScaler
-from abstracts import PricerAbstract
-from abstracts import SamplerAbstract
+from numba import njit
+from src.pricers.abstract_pricer import PricerAbstract
+from src.samplers.abstract_sampler import SamplerAbstract
 
 class LSPIPricer(PricerAbstract):
     def __init__(
@@ -12,6 +13,7 @@ class LSPIPricer(PricerAbstract):
         iterations: int = 20,
         tol: float = 1e-5,
         lambda_reg: float = 1e-1,
+        use_q_only_as_indicator = False
     ):
         self.sampler = sampler
         self.iterations = iterations
@@ -20,6 +22,7 @@ class LSPIPricer(PricerAbstract):
         self.w: np.ndarray | None = None
         self.scaler = StandardScaler()
         self.is_fitted_ = False
+        self.use_q_only_as_indicator = use_q_only_as_indicator
 
         # Проверка равномерности временной сетки
         dt = self.sampler.time_deltas[0]
@@ -68,7 +71,7 @@ class LSPIPricer(PricerAbstract):
         T = self.sampler.time_grid[-1]
         r = -np.log(self.sampler.discount_factor[0, 1] / self.sampler.discount_factor[0, 0]) / self.dt
         
-        # Проверка стабильности discount factor
+        # Проверка детерминированности discount factor
         assert np.allclose(
             self.sampler.discount_factor,
             np.repeat(
@@ -108,15 +111,21 @@ class LSPIPricer(PricerAbstract):
             # Подготовка данных
             phi_curr = phi_all[:, :-1, :]  # Текущие состояния (t)
             phi_next = phi_all[:, 1:, :]   # Следующие состояния (t+1)
+            payoff = self.sampler.payoff
             payoff_next = self.sampler.payoff[:, 1:]  # Выплаты в t+1
             
             # Выравнивание в 1D
+            phi_all_flat = phi_all.reshape(-1, n_features)
             phi_curr_flat = phi_curr.reshape(-1, n_features)
             phi_next_flat = phi_next.reshape(-1, n_features)
+            payoff_flat = payoff.reshape(-1)
             payoff_next_flat = payoff_next.reshape(-1)
             
             # Флаг нетерминальных состояний
-            non_terminal = np.tile(np.arange(n_times-1) < n_times-2, (n_paths, 1))
+            non_terminal_next = np.tile(np.arange(n_times-1) < n_times-2, (n_paths, 1))
+            non_terminal_next_flat = non_terminal_next.reshape(-1)
+
+            non_terminal = np.tile(np.arange(n_times) < n_times-1, (n_paths, 1))
             non_terminal_flat = non_terminal.reshape(-1)
             
             # Итерации LSPI
@@ -124,19 +133,34 @@ class LSPIPricer(PricerAbstract):
                 prev_w = deepcopy(w)
                 
                 # Вычисляем Q-значения продолжения
-                Q_cont_next = phi_next_flat @ w
-                
-                # Условие продолжения
-                continue_cond = non_terminal_flat & (Q_cont_next >= payoff_next_flat)
-                
-                # Формируем систему уравнений
-                diff_phi = phi_curr_flat - gamma * continue_cond[:, None] * phi_next_flat
-                A = phi_curr_flat.T @ diff_phi
-                b = phi_curr_flat.T @ (gamma * (1 - continue_cond) * payoff_next_flat)
-                
-                # Регуляризация и решение
-                A_reg = A + self.lambda_reg * np.eye(n_features)
-                w = np.linalg.solve(A_reg, b)
+                if not self.use_q_only_as_indicator:
+                    Q_cont_next = phi_next_flat @ w
+                    # Условие продолжения
+                    continue_cond = non_terminal_next_flat & ((Q_cont_next >= payoff_next_flat) | (payoff_next_flat < 0))
+                    
+                    # Формируем систему уравнений
+                    diff_phi = phi_curr_flat - gamma * continue_cond[:, None] * phi_next_flat
+                    A = phi_curr_flat.T @ diff_phi
+                    b = phi_curr_flat.T @ (gamma * (1 - continue_cond) * payoff_next_flat)
+                    
+                    # Регуляризация и решение
+                    A_reg = A + self.lambda_reg * np.eye(n_features)
+                    w = np.linalg.solve(A_reg, b)
+                else:
+                    rewards = (
+                        (
+                            ~non_terminal_flat | 
+                            (
+                            ((phi_all_flat @ w).reshape(-1) < payoff_flat)
+                            & 
+                            ~(payoff_flat < 0)
+                            )) * \
+                        payoff_flat
+                    ).reshape(n_paths, n_times)
+
+                    Q_cont_next = spread_with_gamma(rewards, gamma)[:, 1:].reshape(-1)
+
+                    w = np.linalg.lstsq(phi_curr_flat, gamma * Q_cont_next, rcond=1e-10)[0]
                 
                 # Проверка сходимости
                 diff_norm = np.linalg.norm(w - prev_w)
@@ -159,9 +183,46 @@ class LSPIPricer(PricerAbstract):
                 payoff_t = self.sampler.payoff[p, t]
                 
                 # Условие исполнения
+                disc_factor = self.sampler.discount_factor[p, t]
                 if payoff_t >= Q_cont or t == n_times - 1:
-                    disc_factor = self.sampler.discount_factor[p, t]
                     pv_payoffs[p] = disc_factor * payoff_t
                     break
+
+        if not quiet:
+            print("q-value at 0:", phi_all[0, 0] @ self.w)
+            print("Option price:", np.mean(pv_payoffs))
         
         return np.array([np.mean(pv_payoffs)])
+
+
+@njit
+def spread_with_gamma(arr, gamma):
+    result = np.zeros_like(arr)
+    rows, cols = np.where(np.abs(arr) > 1e-6)
+    
+    for i, j in zip(rows, cols):
+        if arr[i, j] == 0:
+            continue
+            
+        # Создаем диапазон для влияния
+        k_values = np.arange(j + 1)
+        powers = j - k_values
+        influences = (gamma ** powers) * arr[i, j]
+        
+        # Находим позиции, которые еще не заполнены
+        target_pos = k_values[result[i, k_values] == 0]
+        result[i, target_pos] = influences[target_pos]
+        
+        # Обнуляем где power == 0
+        result[i, j] = 0
+        
+    return result
+
+bellman_opt_eq(
+    phi_curr_flat, 
+    phi_next_flat, 
+    payoff_next_flat, 
+    pricer.w * 0.99, 
+    gamma,
+    pricer.w
+)

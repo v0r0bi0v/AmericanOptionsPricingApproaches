@@ -16,8 +16,8 @@ PRICER_NAME = "LSPIPricer"
 assert PRICER_NAME in ["BinomialTreePricer", "LSPIPricer", "AmericanMonteCarloPricer"]
 
 
-CNT_REPEATS = 1
-CNT_TRAJECTORIES = [100_000]  # np.linspace(1_000, 100_000, 5, dtype=int)
+CNT_REPEATS = 8
+CNT_TRAJECTORIES = np.linspace(1_000, 100_000, 5, dtype=int)
 
 SAVES_DIR = "0"
 
@@ -55,7 +55,7 @@ def process_repeats(args):
 
 def run_pricing_multiple_times(test=True, quiet=False, num_cores=None):
     if num_cores is None:
-        num_cores = -1
+        num_cores = -
 
     train_prices = np.empty((len(CNT_TRAJECTORIES), CNT_REPEATS))
     test_prices = np.empty((len(CNT_TRAJECTORIES), CNT_REPEATS))
