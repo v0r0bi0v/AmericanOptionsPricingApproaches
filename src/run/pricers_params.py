@@ -3,12 +3,15 @@ PARAMS = {
         "regularization_alpha": 1e-3
     },
     "LSPIPricer": {
-        "iterations": 20,
-        "tol": 1e-5,
-        "lambda_reg": 1e-1
+        "iterations": 25,
+        "lambda_reg": 0
     },
     "BinomialTreePricer": {
         
+    },
+    "LSPIPricerNSteps": {
+        "iterations": 25,
+        "lambda_reg": 0
     }
     # here might be other pricers
 }

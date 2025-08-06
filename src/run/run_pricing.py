@@ -55,7 +55,7 @@ def process_repeats(args):
 
 def run_pricing_multiple_times(test=True, quiet=False, num_cores=None):
     if num_cores is None:
-        num_cores = -1
+        num_cores = -
 
     train_prices = np.empty((len(CNT_TRAJECTORIES), CNT_REPEATS))
     test_prices = np.empty((len(CNT_TRAJECTORIES), CNT_REPEATS))
