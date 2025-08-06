@@ -6,14 +6,13 @@ from numba import njit
 from src.pricers.abstract_pricer import PricerAbstract
 from src.samplers.abstract_sampler import SamplerAbstract
 
-class LSPIPricer(PricerAbstract):
+class LSPINStepsPricer(PricerAbstract):
     def __init__(
         self,
         sampler: SamplerAbstract,
         iterations: int = 20,
         tol: float = 1e-5,
-        lambda_reg: float = 1e-1,
-        use_q_only_as_indicator = False
+        lambda_reg: float = 1e-1
     ):
         self.sampler = sampler
         self.iterations = iterations
@@ -22,7 +21,6 @@ class LSPIPricer(PricerAbstract):
         self.w: np.ndarray | None = None
         self.scaler = StandardScaler()
         self.is_fitted_ = False
-        self.use_q_only_as_indicator = use_q_only_as_indicator
 
         # Проверка равномерности временной сетки
         dt = self.sampler.time_deltas[0]
@@ -132,36 +130,24 @@ class LSPIPricer(PricerAbstract):
             for it in range(self.iterations):
                 prev_w = deepcopy(w)
                 
-                # Вычисляем Q-значения продолжения
-                if not self.use_q_only_as_indicator:
-                    Q_cont_next = phi_next_flat @ w
-                    # Условие продолжения
-                    continue_cond = non_terminal_next_flat & ((Q_cont_next >= payoff_next_flat) | (payoff_next_flat < 0))
-                    
-                    # Формируем систему уравнений
-                    diff_phi = phi_curr_flat - gamma * continue_cond[:, None] * phi_next_flat
-                    A = phi_curr_flat.T @ diff_phi
-                    b = phi_curr_flat.T @ (gamma * (1 - continue_cond) * payoff_next_flat)
-                    
-                    # Регуляризация и решение
-                    A_reg = A + self.lambda_reg * np.eye(n_features)
-                    w = np.linalg.solve(A_reg, b)
-                else:
-                    rewards = (
+                rewards = (
+                    (
+                        ~non_terminal_flat | 
                         (
-                            ~non_terminal_flat | 
-                            (
-                            ((phi_all_flat @ w).reshape(-1) < payoff_flat)
-                            & 
-                            ~(payoff_flat < 0)
-                            )) * \
-                        payoff_flat
-                    ).reshape(n_paths, n_times)
+                        ((phi_all_flat @ w).reshape(-1) < payoff_flat)
+                        & 
+                        ~(payoff_flat < 0)
+                        )) * \
+                    payoff_flat
+                ).reshape(n_paths, n_times)
 
-                    Q_cont_next = spread_with_gamma(rewards, gamma)[:, 1:].reshape(-1)
+                Q_cont_next = spread_with_gamma(rewards, gamma)[:, 1:].reshape(-1)
 
-                    w = np.linalg.lstsq(phi_curr_flat, gamma * Q_cont_next, rcond=1e-10)[0]
-                
+                X = phi_curr_flat
+                y = gamma * Q_cont_next
+                w = np.linalg.pinv(X.T @ X + np.eye(n_features) * self.lambda_reg, rcond=1e-10) \
+                    @ (X.T @ y)
+
                 # Проверка сходимости
                 diff_norm = np.linalg.norm(w - prev_w)
                 if not quiet:
@@ -218,11 +204,11 @@ def spread_with_gamma(arr, gamma):
         
     return result
 
-bellman_opt_eq(
-    phi_curr_flat, 
-    phi_next_flat, 
-    payoff_next_flat, 
-    pricer.w * 0.99, 
-    gamma,
-    pricer.w
-)
+# bellman_opt_eq(
+#     phi_curr_flat, 
+#     phi_next_flat, 
+#     payoff_next_flat, 
+#     pricer.w * 0.99, 
+#     gamma,
+#     pricer.w
+# )

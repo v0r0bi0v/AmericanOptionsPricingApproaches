@@ -4,8 +4,7 @@ PARAMS = {
     },
     "LSPIPricer": {
         "iterations": 25,
-        "lambda_reg": 0,
-        "use_q_only_as_indicator": True
+        "lambda_reg": 0
     },
     "BinomialTreePricer": {
         
