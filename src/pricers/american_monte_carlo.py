@@ -116,3 +116,22 @@ class AmericanMonteCarloPricer(PricerAbstract):
         }
 
         return self.price_history
+    
+    def continuation_value(self, state, t):
+        assert isinstance(t, float | int)
+        if isinstance(state, float | int):
+            state = np.array([[state]])
+        elif isinstance(state, list | np.ndarray):
+            state = np.array([state])
+            assert len(state.shape) == 2
+        else:
+            raise ValueError()
+        assert ((self.sampler.time_grid - t)**2).min() < 1e-6
+        i = np.argmin((self.sampler.time_grid - t)**2)
+        if self.weights[i] is None: 
+            return np.nan
+        return (
+            self.basis_functions_transformer.transform(
+                self.scalers[i].transform(state)
+            ) @ self.weights[i]
+        ).flatten()[0] / self.sampler.discount_factor[0][i]

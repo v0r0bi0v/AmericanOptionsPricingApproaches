@@ -26,19 +26,21 @@ class LSPIBookPricer(PricerAbstract):
         dt = self.sampler.time_deltas[0]
         assert np.allclose(np.diff(sampler.time_grid), dt), "Time grid must be uniform"
         self.dt = dt
+        self.T = self.sampler.time_grid[-1]
 
-    def _basis_functions_raw(self, S: np.ndarray, K: float, t: np.ndarray, T: float) -> np.ndarray:
-        M = S / K
-        exp_term = np.exp(-M / 2.0)
+    def _basis_functions_raw(self, markov_state: np.ndarray, t: np.ndarray) -> np.ndarray:
+        t = np.tile(t, (markov_state.shape[0], 1))
+        S = markov_state[:, :, 0] / 100
+        exp_term = np.exp(-S / 2.0)
 
         phi = np.zeros((*S.shape, 7), dtype=float)
         phi[..., 0] = 1.0 
         phi[..., 1] = exp_term
-        phi[..., 2] = exp_term * (1.0 - M)
-        phi[..., 3] = exp_term * (1.0 - 2.0 * M + 0.5 * M * M)
-        phi[..., 4] = np.sin(np.pi * (T - t) / (2.0 * T))
-        phi[..., 5] = np.log(np.maximum(T - t, 1e-10))
-        phi[..., 6] = (t / T) ** 2
+        phi[..., 2] = exp_term * (1.0 - S)
+        phi[..., 3] = exp_term * (1.0 - 2.0 * S + 0.5 * S * S)
+        phi[..., 4] = np.sin(np.pi * (self.T - t) / (2.0 * self.T))
+        phi[..., 5] = np.log(np.maximum(self.T - t, 1e-10))
+        phi[..., 6] = (t / self.T) ** 2
         return phi
 
     def _scale_features(self, phi: np.ndarray, fit: bool = False) -> np.ndarray:
@@ -65,8 +67,6 @@ class LSPIBookPricer(PricerAbstract):
     def price(self, test: bool = False, quiet: bool = False) -> np.ndarray:
         self.sampler.sample()
         
-        K = self.sampler.strike
-        T = self.sampler.time_grid[-1]
         r = -np.log(self.sampler.discount_factor[0, 1] / self.sampler.discount_factor[0, 0]) / self.dt
         
         # Проверка детерминированности discount factor
@@ -82,13 +82,9 @@ class LSPIBookPricer(PricerAbstract):
         # Параметры путей
         n_paths, n_times, _ = self.sampler.markov_state.shape
         gamma = np.exp(-r * self.dt)
-        S_paths = self.sampler.markov_state[:, :, 0]  # Берем только цену актива
-
-        # Создаем расширенную временную сетку
-        time_grid_expanded = np.tile(self.sampler.time_grid, (n_paths, 1))
         
         # Создаем базисные функции
-        phi_all_raw = self._basis_functions_raw(S_paths, K, time_grid_expanded, T)
+        phi_all_raw = self._basis_functions_raw(self.sampler.markov_state, self.sampler.time_grid)
         
         # Применяем скейлинг
         if not test:
@@ -109,22 +105,16 @@ class LSPIBookPricer(PricerAbstract):
             # Подготовка данных
             phi_curr = phi_all[:, :-1, :]  # Текущие состояния (t)
             phi_next = phi_all[:, 1:, :]   # Следующие состояния (t+1)
-            payoff = self.sampler.payoff
             payoff_next = self.sampler.payoff[:, 1:]  # Выплаты в t+1
             
             # Выравнивание в 1D
-            phi_all_flat = phi_all.reshape(-1, n_features)
             phi_curr_flat = phi_curr.reshape(-1, n_features)
             phi_next_flat = phi_next.reshape(-1, n_features)
-            payoff_flat = payoff.reshape(-1)
             payoff_next_flat = payoff_next.reshape(-1)
             
             # Флаг нетерминальных состояний
             non_terminal_next = np.tile(np.arange(n_times-1) < n_times-2, (n_paths, 1))
             non_terminal_next_flat = non_terminal_next.reshape(-1)
-
-            non_terminal = np.tile(np.arange(n_times) < n_times-1, (n_paths, 1))
-            non_terminal_flat = non_terminal.reshape(-1)
             
             # Итерации LSPI
             for it in range(self.iterations):
@@ -133,9 +123,16 @@ class LSPIBookPricer(PricerAbstract):
                 Q_cont_next = phi_next_flat @ w
                 continue_cond = non_terminal_next_flat & ((Q_cont_next >= payoff_next_flat) | (payoff_next_flat < 0))
                 
-                diff_phi = phi_curr_flat - gamma * continue_cond[:, None] * phi_next_flat
-                A = phi_curr_flat.T @ diff_phi
-                b = phi_curr_flat.T @ (gamma * (1 - continue_cond) * payoff_next_flat)
+                A = np.einsum(
+                    'ij,ik->jk', 
+                    phi_curr_flat, 
+                    phi_curr_flat - gamma * continue_cond[:, np.newaxis] * phi_next_flat
+                )
+                b = np.einsum(
+                    'ij,ik->jk', 
+                    phi_curr_flat, 
+                    (gamma * (~continue_cond) * payoff_next_flat)[:, np.newaxis]
+                ).flatten()
                 
                 A_reg = A + self.lambda_reg * np.eye(n_features)
                 w = np.linalg.solve(A_reg, b)
@@ -170,37 +167,22 @@ class LSPIBookPricer(PricerAbstract):
             print("q-value at 0:", phi_all[0, 0] @ self.w)
             print("Option price:", np.mean(pv_payoffs))
         
-        return np.array([np.mean(pv_payoffs)])
-
-
-@njit
-def spread_with_gamma(arr, gamma):
-    result = np.zeros_like(arr)
-    rows, cols = np.where(np.abs(arr) > 1e-6)
+        return np.array([np.mean(pv_payoffs)]), A, b
     
-    for i, j in zip(rows, cols):
-        if arr[i, j] == 0:
-            continue
-            
-        # Создаем диапазон для влияния
-        k_values = np.arange(j + 1)
-        powers = j - k_values
-        influences = (gamma ** powers) * arr[i, j]
-        
-        # Находим позиции, которые еще не заполнены
-        target_pos = k_values[result[i, k_values] == 0]
-        result[i, target_pos] = influences[target_pos]
-        
-        # Обнуляем где power == 0
-        result[i, j] = 0
-        
-    return result
+    def continuation_value(self, state, t):
+        if isinstance(state, float | int | list | np.ndarray) and isinstance(t, float | int):
+            if isinstance(state, list | np.ndarray):
+                state = np.array(state)[np.newaxis, np.newaxis, :]
+                assert len(state.shape) == 3
+            else:
+                state = np.array([[[state]]])
+            t = np.array([t])
+        else:
+            raise ValueError()
 
-# bellman_opt_eq(
-#     phi_curr_flat, 
-#     phi_next_flat, 
-#     payoff_next_flat, 
-#     pricer.w * 0.99, 
-#     gamma,
-#     pricer.w
-# )
+        return (
+            self._scale_features(
+                self._basis_functions_raw(state, t), 
+                fit=False
+            ) @ self.w
+        ).flatten()[0]
