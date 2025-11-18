@@ -1,6 +1,6 @@
 \documentclass[8pt]{article}
 
-\usepackage[russian,english]{babel}
+\usepackage[english,russian]{babel} 
 
 \usepackage{cmap}
 \usepackage[T2A]{fontenc}
@@ -79,12 +79,9 @@
 
 \renewcommand{\phi}{\varphi}
 \renewcommand{\epsilon}{\varepsilon}
-\renewcommand{\le}{\leqslant}
-\renewcommand{\ge}{\geqslant}
-
 
 \begin{document}
-    \title{American Options Pricing Approaches}
+    \title{Оценка стоимости деривативов на основе методов обучения с подкреплением}
 
     \date{\today}
 
@@ -94,18 +91,17 @@
 
     \tableofcontents
 
-    \section{Introduction}
+    \section{Введение}
         \input{sections/introduction}
 
     \section{Least-Squares Monte Carlo \cite{LSMC}}
         \input{sections/lsmc}
 
-    \section{RL methods}
+    \section{Методы Reinforcement Learning}
         \input{sections/rl-methods}
 
     \section{Upper Bound (via dual problem)}
         \input{sections/upper-bound}
-
 
     \section{RL vs LSMC}
         \input{sections/rl-vs-lsmc}
@@ -122,4 +118,5 @@
 
     \nocite{*}
     \printbibliography
+
 \end{document}
