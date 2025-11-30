@@ -12,11 +12,10 @@ from src.run.pricers_params import PARAMS as PRICERS_PARAMS
 SAMPLER_NAME = "GeometricBrownianMotionPutSampler"
 assert SAMPLER_NAME in ["GeometricBrownianMotionPutSampler", "WienerRainbowPutOptionSampler"]
 
-PRICER_NAME = "LSPIPricer"
-assert PRICER_NAME in ["BinomialTreePricer", "LSPIPricer", "AmericanMonteCarloPricer"]
+PRICER_NAME = "LSPIPricerDiploma"
+assert PRICER_NAME in ["BinomialTreePricer", "AmericanMonteCarloPricer", "LSPIPricerDiploma", "FQIPricerDiploma"]
 
-
-CNT_REPEATS = 8
+CNT_REPEATS = 3
 CNT_TRAJECTORIES = np.linspace(1_000, 100_000, 5, dtype=int)
 
 SAVES_DIR = "3"
@@ -55,7 +54,7 @@ def process_repeats(args):
 
 def run_pricing_multiple_times(test=True, quiet=False, num_cores=None):
     if num_cores is None:
-        num_cores = -
+        num_cores = -1
 
     train_prices = np.empty((len(CNT_TRAJECTORIES), CNT_REPEATS))
     test_prices = np.empty((len(CNT_TRAJECTORIES), CNT_REPEATS))

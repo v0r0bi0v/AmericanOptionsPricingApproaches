@@ -12,7 +12,7 @@ class LSPIBookPricer(PricerAbstract):
         sampler: SamplerAbstract,
         iterations: int = 20,
         tol: float = 1e-5,
-        lambda_reg: float = 1e-1,
+        lambda_reg: float = 0.1,
     ):
         self.sampler = sampler
         self.iterations = iterations
@@ -30,7 +30,7 @@ class LSPIBookPricer(PricerAbstract):
 
     def _basis_functions_raw(self, markov_state: np.ndarray, t: np.ndarray) -> np.ndarray:
         t = np.tile(t, (markov_state.shape[0], 1))
-        S = markov_state[:, :, 0] / 100
+        S = markov_state[:, :, 0] / self.sampler.strike
         exp_term = np.exp(-S / 2.0)
 
         phi = np.zeros((*S.shape, 7), dtype=float)
@@ -99,6 +99,9 @@ class LSPIBookPricer(PricerAbstract):
             w = np.zeros(n_features) if self.w is None else self.w.copy()
         else:
             w = self.w
+            
+        A: Optional[np.ndarray] = None
+        b: Optional[np.ndarray] = None
 
         # Режим обучения (обновление весов)
         if not test:
